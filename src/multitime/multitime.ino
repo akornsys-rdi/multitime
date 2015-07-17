@@ -57,16 +57,16 @@
 #define BPERCENT 4                      // Draw: Percentual mode bar, for use within drawBar() function
 #define BBLANK 5                        // Draw: Empty bar (clear), for use within drawBar() function
 // STATUS ENABLE VALUES
-#define ENALARM 16                      // Draw: Daily alarm enabled indicator on status bar, for use within drawStatus() function
-#define ENPOMODORO 8                    // Draw: Pomodoro enabled indicator on status bar, for use within drawStatus() function
-#define ENTIMER 4                       // Draw: Timer enabled indicator on status bar, for use within drawStatus() function
-#define ENSYNC 1                        // Draw: Synchronism attempt indicator on status bar, for use within drawStatus() function
+#define ENALARM 4                       // Draw: Daily alarm enabled indicator on status bar, for use within drawStatus() function
+#define ENPOMODORO 3                    // Draw: Pomodoro enabled indicator on status bar, for use within drawStatus() function
+#define ENTIMER 2                       // Draw: Timer enabled indicator on status bar, for use within drawStatus() function
+#define ENSYNC 0                        // Draw: Synchronism attempt indicator on status bar, for use within drawStatus() function
 // INTERVALS
 #define REFRESH_VALUES 300              // Adjustable: Milliseconds between update values from now() function (default: 300)
 #define SHOW_LOGO 1000                  // Adjustable: Milliseconds to show logo of the selected mode (default: 1000)
 #define LONG_PRESS 1000                 // Adjustable: Milliseconds to hold push button before being considered long press (default: 1000)
 #define DOUBLE_PRESS 2000               // Adjustable: Milliseconds to hold push button before being considered double press (default: 2000)
-#define SYNC_INTERVAL 30*1000           // Adjustable: Milliseconds between synchronization request (default: 30000)
+#define SYNC_INTERVAL 300*1000UL        // Adjustable: Milliseconds between synchronization request (default: 300000UL) UL is needed if greater than 32767
 #define SYNC_TIMEOUT 10*1000            // Adjustable: Milliseconds between synchronization request after failed attempt (default: 10000)
 // KEYPRESS
 #define NO_KEY 0                        // Button: Keypress identificator to no press of push button, for use within selectButton() function
@@ -129,6 +129,7 @@ void setup() {
 void loop() {
     static unsigned char mode = 1;
     static unsigned char modeLatched = 0xFF;
+    static unsigned char modeSet = 0;
     static unsigned char enabled = 0;
     static unsigned char updateDisplay = 0;
     static unsigned char syncStatus = NO_SET_NOR_SYNCED;
@@ -142,8 +143,13 @@ void loop() {
     // if button pressed, process
     keyStatus = selectButton(DOUBLE_KEY);
     if (keyStatus == LONG_KEY) {
-        modeLatched = !modeLatched;
+        if (!modeSet) modeLatched = !modeLatched;
     }
+    /*
+     * 1 - up/continue
+     * 2 - mode/set
+     * 3 - options
+     */
 
 
 //XXX
@@ -167,7 +173,7 @@ void loop() {
         // if time not set or synced long time ago, try to sync
         if (((millis() - previousSync ) > (SYNC_INTERVAL)) || (timeStatus() == timeNotSet)) {
             syncStatus = NEEDS_SYNC;
-            if (bitRead(enabled,0) == 0) enabled += ENSYNC; //activa flag en pantalla si no lo estaba
+            if (bitRead(enabled,ENSYNC) == 0) enabled += bit(ENSYNC); //activa flag en pantalla si no lo estaba
             if (Serial.available()) { //si hay dato en puerto serie, intenta sincronizar
                 if (processSyncMessage()) previousSync = millis(); //si ha sincronizado, establece variable
             }
@@ -179,7 +185,7 @@ void loop() {
         // if time is synced
         else {
             syncStatus = SET_AND_SYNCED;
-            if (bitRead(enabled,0) == 1) enabled -= ENSYNC;
+            if (bitRead(enabled,ENSYNC) == 1) enabled -= bit(ENSYNC);
         }
         drawStatus(mode,enabled);
     }
@@ -216,11 +222,13 @@ void loop() {
           //        drawText(SET_HOUR,5);
           //        drawBar(0,SET_MIN);
           //        break;
-          //      // POMODORO
-          //      case 5:
-          //        drawText(POMODORO_TIME - minute(t),5);
-          //        drawBar(3,POMODORO_COUNT);
-          //        break;
+            // POMODORO
+            case 5:
+                if (keyStatus == DOUBLE_KEY) enabled ^= bit(ENPOMODORO) & 0xFF;
+                if (bitRead(enabled,ENPOMODORO) == 0) enabled += bit(ENPOMODORO);
+                //drawText(POMODORO_TIME - minute(t),5);
+                //drawBar(3,POMODORO_COUNT);
+                break;
           //      // TIMER
           //      case 6:
           //        drawText(TIMER_TIME - minute(t),5);
